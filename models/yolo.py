@@ -68,6 +68,8 @@ try:
 except ImportError:
     thop = None
 
+from models.common import CBAM
+globals()["CBAM"] = CBAM
 
 class Detect(nn.Module):
     """YOLOv5 Detect head for processing input tensors and generating detection outputs in object detection models."""
