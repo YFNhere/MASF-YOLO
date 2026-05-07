@@ -1113,20 +1113,25 @@ class Classify(nn.Module):
         return self.linear(self.drop(self.pool(self.conv(x)).flatten(1)))
 
 class CrossScaleFusion(nn.Module):
-    def __init__(self, c1):
+    def __init__(self, c2):
         super().__init__()
 
+        self.reduce_p4 = nn.Conv2d(512, c2, 1)
+        self.reduce_p5 = nn.Conv2d(1024, c2, 1)
+
         self.conv = nn.Sequential(
-            nn.Conv2d(c1 * 3, c1, 1),
-            nn.BatchNorm2d(c1),
+            nn.Conv2d(c2 * 3, c2, 1),
+            nn.BatchNorm2d(c2),
             nn.SiLU()
         )
 
     def forward(self, x):
-        # x = [P3, P4, P5]
         p3, p4, p5 = x
 
         size = p3.shape[2:]
+
+        p4 = self.reduce_p4(p4)
+        p5 = self.reduce_p5(p5)
 
         p4 = F.interpolate(p4, size=size, mode='nearest')
         p5 = F.interpolate(p5, size=size, mode='nearest')

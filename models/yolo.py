@@ -422,7 +422,6 @@ def parse_model(d, ch):
             nn.ConvTranspose2d,
             DWConvTranspose2d,
             C3x,
-            CrossScaleFusion,
         }:
             c1, c2 = ch[f], args[0]
             if c2 != no:  # if not output
@@ -432,6 +431,8 @@ def parse_model(d, ch):
             if m in {BottleneckCSP, C3, C3TR, C3Ghost, C3x}:
                 args.insert(2, n)  # number of repeats
                 n = 1
+        elif m is CrossScaleFusion:
+            c2 = args[0]
         elif m is nn.BatchNorm2d:
             args = [ch[f]]
         elif m is Concat:
