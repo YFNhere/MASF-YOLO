@@ -1112,23 +1112,25 @@ class Classify(nn.Module):
         return self.linear(self.drop(self.pool(self.conv(x)).flatten(1)))
 
 class ChannelAttention(nn.Module):
-    def __init__(self, in_planes, ratio=16):
+    def __init__(self, c1, ratio=16):
         super().__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.max_pool = nn.AdaptiveMaxPool2d(1)
-        hidden_planes = max(in_planes // ratio, 1)
+        # 安全通道数，永远不会报错
+        c2 = max(1, c1 // ratio)
 
         self.fc = nn.Sequential(
-            nn.Conv2d(in_planes, hidden_planes, 1, bias=False),
-            nn.ReLU(),
-            nn.Conv2d(hidden_planes, in_planes, 1, bias=False)
+            nn.Conv2d(c1, c2, 1, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(c2, c1, 1, bias=False)
         )
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         avg_out = self.fc(self.avg_pool(x))
         max_out = self.fc(self.max_pool(x))
-        return self.sigmoid(avg_out + max_out)
+        out = avg_out + max_out
+        return self.sigmoid(out)
 
 class SpatialAttention(nn.Module):
     def __init__(self, kernel_size=7):
@@ -1138,12 +1140,12 @@ class SpatialAttention(nn.Module):
 
     def forward(self, x):
         avg_out = torch.mean(x, dim=1, keepdim=True)
-        max_out, _ = torch.max(x, dim=1, keepdim=True)
-        x = torch.cat([avg_out, max_out], dim=1)
-        return self.sigmoid(self.conv(x))
-
+        max_out, _ = torch.max(x, dim=1, keepdim=True)        x = torch.cat([avg_out, max_out], dim=1)
+        x = self.conv(x)
+        return self.sigmoid(x)
 
 class CBAM(nn.Module):
+    # 🔥 这是 YOLOv5 标准格式！必须这样写！
     def __init__(self, c1, ratio=16, kernel_size=7):
         super().__init__()
         self.ca = ChannelAttention(c1, ratio)
