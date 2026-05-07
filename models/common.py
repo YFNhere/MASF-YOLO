@@ -1116,8 +1116,9 @@ class CrossScaleFusion(nn.Module):
     def __init__(self, c2):
         super().__init__()
 
-        self.reduce_p4 = nn.Conv2d(512, c2, 1)
-        self.reduce_p5 = nn.Conv2d(1024, c2, 1)
+        # yolov5s 实际通道
+        self.reduce_p4 = nn.Conv2d(256, c2, 1)
+        self.reduce_p5 = nn.Conv2d(512, c2, 1)
 
         self.conv = nn.Sequential(
             nn.Conv2d(c2 * 3, c2, 1),
