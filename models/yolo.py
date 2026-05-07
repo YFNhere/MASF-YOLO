@@ -48,6 +48,7 @@ from models.common import (
     GhostBottleneck,
     GhostConv,
     Proto,
+    LightFusion,
 )
 from models.experimental import MixConv2d
 from utils.autoanchor import check_anchor_order
@@ -415,6 +416,7 @@ def parse_model(d, ch):
             CrossConv,
             BottleneckCSP,
             C3,
+            LightFusion,
             C3TR,
             C3SPP,
             C3Ghost,

@@ -1110,3 +1110,35 @@ class Classify(nn.Module):
         if isinstance(x, list):
             x = torch.cat(x, 1)
         return self.linear(self.drop(self.pool(self.conv(x)).flatten(1)))
+
+class LightFusion(nn.Module):
+    def __init__(self, c1, c2):
+        super().__init__()
+
+        self.dwconv = nn.Conv2d(
+            c1,
+            c1,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            groups=c1,
+            bias=False
+        )
+
+        self.pwconv = nn.Conv2d(
+            c1,
+            c2,
+            kernel_size=1,
+            stride=1,
+            bias=False
+        )
+
+        self.bn = nn.BatchNorm2d(c2)
+        self.act = nn.SiLU()
+
+    def forward(self, x):
+        x = self.dwconv(x)
+        x = self.pwconv(x)
+        x = self.bn(x)
+        x = self.act(x)
+        return x
