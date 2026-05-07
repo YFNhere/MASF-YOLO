@@ -1116,8 +1116,6 @@ class ChannelAttention(nn.Module):
         super().__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.max_pool = nn.AdaptiveMaxPool2d(1)
-
-        # ⭐ 防止通道为0（关键）
         hidden_planes = max(in_planes // ratio, 1)
 
         self.fc = nn.Sequential(
@@ -1132,11 +1130,10 @@ class ChannelAttention(nn.Module):
         max_out = self.fc(self.max_pool(x))
         return self.sigmoid(avg_out + max_out)
 
-
 class SpatialAttention(nn.Module):
     def __init__(self, kernel_size=7):
         super().__init__()
-        self.conv = nn.Conv2d(2, 1, kernel_size, padding=3, bias=False)
+        self.conv = nn.Conv2d(2, 1, kernel_size, padding=kernel_size//2, bias=False)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
@@ -1149,7 +1146,7 @@ class SpatialAttention(nn.Module):
 class CBAM(nn.Module):
     def __init__(self, c1, ratio=16, kernel_size=7):
         super().__init__()
-        self.ca = ChannelAttention(channels)
+        self.ca = ChannelAttention(c1, ratio)
         self.sa = SpatialAttention()
 
     def forward(self, x):
