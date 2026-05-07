@@ -19,6 +19,7 @@ import pandas as pd
 import requests
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from PIL import Image
 from torch.cuda import amp
 
@@ -1110,3 +1111,26 @@ class Classify(nn.Module):
         if isinstance(x, list):
             x = torch.cat(x, 1)
         return self.linear(self.drop(self.pool(self.conv(x)).flatten(1)))
+
+class CrossScaleFusion(nn.Module):
+    def __init__(self, c1):
+        super().__init__()
+
+        self.conv = nn.Sequential(
+            nn.Conv2d(c1 * 3, c1, 1),
+            nn.BatchNorm2d(c1),
+            nn.SiLU()
+        )
+
+    def forward(self, x):
+        # x = [P3, P4, P5]
+        p3, p4, p5 = x
+
+        size = p3.shape[2:]
+
+        p4 = F.interpolate(p4, size=size, mode='nearest')
+        p5 = F.interpolate(p5, size=size, mode='nearest')
+
+        out = torch.cat([p3, p4, p5], dim=1)
+
+        return self.conv(out)
