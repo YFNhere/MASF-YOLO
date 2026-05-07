@@ -48,5 +48,5 @@ head: [
     # 新增跨尺度融合
     [[17, 20, 23], 1, CrossScaleFusion, [256]],
     # Detect
-    [[24, 20, 23], 1, Detect, [nc]],
+    [[24, 20, 23], 1, Detect, [nc, anchors]], # Detect(P3, P4, P5)
   ]
