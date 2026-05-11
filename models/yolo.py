@@ -30,6 +30,7 @@ from models.common import (
     C3SE,
     C3SPP,
     C3TR,
+    SE,
     SPP,
     SPPF,
     Bottleneck,
@@ -432,6 +433,10 @@ def parse_model(d, ch):
             if m in {BottleneckCSP, C3, C3SE, C3TR, C3Ghost, C3x}:
                 args.insert(2, n)  # number of repeats
                 n = 1
+        elif m is SE:
+            c1 = ch[f]
+            args = [c1]  # SE only needs channel count, keeps c2 = c1
+            c2 = c1
         elif m is nn.BatchNorm2d:
             args = [ch[f]]
         elif m is Concat:
