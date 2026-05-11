@@ -244,6 +244,42 @@ class C3(nn.Module):
         return self.cv3(torch.cat((self.m(self.cv1(x)), self.cv2(x)), 1))
 
 
+class SE(nn.Module):
+    """Squeeze-Excitation attention module for channel-wise feature recalibration."""
+
+    def __init__(self, c1, r=16):
+        """Initializes SE module with input channels (c1) and reduction ratio (r)."""
+        super().__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(c1, c1 // r, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(c1 // r, c1, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        """Processes input tensor through squeeze and excitation operations to recalibrate channel features."""
+        b, c, _, _ = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1)
+        return x * y.expand_as(x)
+
+
+class C3SE(C3):
+    """C3 module integrated with Squeeze-Excitation attention mechanism."""
+
+    def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):
+        """Initializes C3SE module with SE attention; inherits from C3 with additional channel recalibration."""
+        super().__init__(c1, c2, n, shortcut, g, e)
+        c_ = int(c2 * e)
+        self.se = SE(c_)
+
+    def forward(self, x):
+        """Performs forward propagation with SE attention applied to the bottleneck output."""
+        return self.cv3(torch.cat((self.se(self.m(self.cv1(x))), self.cv2(x)), 1))
+
+
 class C3x(C3):
     """Extends the C3 module with cross-convolutions for enhanced feature extraction in neural networks."""
 
