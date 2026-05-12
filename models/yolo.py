@@ -43,6 +43,7 @@ from models.common import (
     DetectMultiBackend,
     DWConv,
     DWConvTranspose2d,
+    EMA,
     Expand,
     Focus,
     GhostBottleneck,
@@ -421,6 +422,7 @@ def parse_model(d, ch):
             nn.ConvTranspose2d,
             DWConvTranspose2d,
             C3x,
+            EMA,
         }:
             c1, c2 = ch[f], args[0]
             if c2 != no:  # if not output

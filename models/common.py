@@ -1072,6 +1072,134 @@ class Detections:
         """Returns a string representation of the YOLOv5 object, including its class and formatted results."""
         return f"YOLOv5 {self.__class__} instance\n" + self.__str__()
 
+class EMA(nn.Module):
+    """
+    Efficient Multi-Scale Attention Module (EMA)
+    Reference:
+    Efficient Multi-Scale Attention Module with Cross-Spatial Learning
+    (ICASSP 2023)
+
+    Optimized version for YOLOv5 small object detection:
+    - Reduced grouping factor for lightweight models
+    - Residual connection added
+    - Stable GroupNorm strategy
+    - Safer tensor reshape operations
+
+    Args:
+        c (int): input/output channels
+        factor (int): channel grouping factor
+    """
+
+    def __init__(self, c, factor=16):
+        super().__init__()
+
+        self.groups = factor
+        self.c = c
+
+        assert c % self.groups == 0, \
+            f"Channels {c} must be divisible by factor {self.groups}"
+
+        c_per_group = c // self.groups
+
+        # Softmax
+        self.softmax = nn.Softmax(dim=-1)
+
+        # Global pooling
+        self.agp = nn.AdaptiveAvgPool2d((1, 1))
+
+        # Direction-aware pooling
+        self.pool_h = nn.AdaptiveAvgPool2d((None, 1))
+        self.pool_w = nn.AdaptiveAvgPool2d((1, None))
+
+        # Normalization
+        # More stable than GroupNorm(c,c)
+        self.gn = nn.GroupNorm(1, c_per_group)
+
+        # Feature interaction
+        self.conv1x1 = nn.Conv2d(
+            c_per_group,
+            c_per_group,
+            kernel_size=1,
+            stride=1,
+            padding=0
+        )
+
+        self.conv3x3 = nn.Conv2d(
+            c_per_group,
+            c_per_group,
+            kernel_size=3,
+            stride=1,
+            padding=1
+        )
+
+    def forward(self, x):
+
+        identity = x
+
+        b, c, h, w = x.size()
+
+        c_per_group = c // self.groups
+
+        # =========================
+        # Channel grouping
+        # =========================
+        group_x = x.contiguous().view(
+            b * self.groups,
+            c_per_group,
+            h,
+            w
+        )
+
+        # =========================
+        # Cross-spatial learning
+        # =========================
+
+        # H-direction pooling
+        x_h = self.pool_h(group_x)
+
+        # W-direction pooling
+        x_w = self.pool_w(group_x).permute(0, 1, 3, 2)
+
+        # Spatial interaction
+        hw = self.conv1x1(torch.cat([x_h, x_w], dim=2))
+
+        x_h, x_w = torch.split(hw, [h, w], dim=2)
+
+        # Spatial attention
+        x1 = self.gn(
+            group_x
+            * x_h.sigmoid()
+            * x_w.permute(0, 1, 3, 2).sigmoid()
+        )
+
+        # Local feature branch
+        x2 = self.conv3x3(group_x)
+
+        # =========================
+        # Cross attention weights
+        # =========================
+
+        x11 = self.softmax(
+            self.agp(x1)
+            .view(b * self.groups, -1, 1)
+            .permute(0, 2, 1)
+        )
+
+        x12 = x2.view(
+            b * self.groups,
+            c_per_group,
+            -1
+        )
+
+        x21 = self.softmax(
+            self.agp(x2)
+            .view(b * self.groups, -1, 1)
+            .permute(0, 2, 1)
+        )
+
+        x22 = x1.view(
+            b * self.groups,
+            c
 
 class Proto(nn.Module):
     """YOLOv5 mask Proto module for segmentation models, performing convolutions and upsampling on input tensors."""

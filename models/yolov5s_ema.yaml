@@ -1,0 +1,155 @@
+# Ultralytics 🚀 AGPL-3.0 License
+
+# YOLOv5s + EMA Attention for Small Object Detection
+# Reference:
+# Efficient Multi-Scale Attention Module with Cross-Spatial Learning
+# (ICASSP 2023)
+
+# ------------------------------------------------------------
+# Design Strategy
+# ------------------------------------------------------------
+# 1. Preserve shallow texture details for small objects
+# 2. Apply EMA only on medium/high-level fused features
+# 3. Avoid excessive attention stacking
+# 4. Enhance cross-scale semantic interaction
+# 5. Maintain lightweight structure for YOLOv5s
+# ------------------------------------------------------------
+
+# Parameters
+nc: 80
+depth_multiple: 0.33
+width_multiple: 0.50
+
+anchors:
+  - [10, 13, 16, 30, 33, 23]       # P3/8
+  - [30, 61, 62, 45, 59, 119]      # P4/16
+  - [116, 90, 156, 198, 373, 326]  # P5/32
+
+# ------------------------------------------------------------
+# Backbone
+# ------------------------------------------------------------
+# Keep shallow layers unchanged
+# Preserve spatial texture information for small objects
+# ------------------------------------------------------------
+
+backbone:
+  [
+    # 0-P1/2
+    [-1, 1, Conv, [64, 6, 2, 2]],
+
+    # 1-P2/4
+    [-1, 1, Conv, [128, 3, 2]],
+
+    # 2
+    [-1, 3, C3, [128]],
+
+    # 3-P3/8
+    [-1, 1, Conv, [256, 3, 2]],
+
+    # 4
+    [-1, 6, C3, [256]],
+
+    # 5-P4/16
+    [-1, 1, Conv, [512, 3, 2]],
+
+    # 6
+    [-1, 9, C3, [512]],
+
+    # 7-P5/32
+    [-1, 1, Conv, [1024, 3, 2]],
+
+    # 8
+    [-1, 3, C3, [1024]],
+
+    # 9
+    [-1, 1, SPPF, [1024, 5]],
+  ]
+
+# ------------------------------------------------------------
+# Head
+# ------------------------------------------------------------
+# EMA is only applied to medium/high-level fused features
+# to avoid suppressing shallow small-object textures.
+# ------------------------------------------------------------
+
+head:
+  [
+
+    # =========================
+    # P5 -> P4
+    # =========================
+
+    # 10
+    [-1, 1, Conv, [512, 1, 1]],
+
+    # 11
+    [-1, 1, nn.Upsample, [None, 2, "nearest"]],
+
+    # 12
+    [[-1, 6], 1, Concat, [1]],
+
+    # 13
+    [-1, 1, EMA, [384]],
+
+    # 14
+    [-1, 3, C3, [512, False]],
+
+    # =========================
+    # P4 -> P3
+    # =========================
+
+    # 15
+    [-1, 1, Conv, [256, 1, 1]],
+
+    # 16
+    [-1, 1, nn.Upsample, [None, 2, "nearest"]],
+
+    # 17
+    [[-1, 4], 1, Concat, [1]],
+
+    # NOTE:
+    # No EMA here to preserve
+    # shallow small-object textures
+
+    # 18 (P3 output)
+    [-1, 3, C3, [256, False]],
+
+    # =========================
+    # P3 -> P4
+    # =========================
+
+    # 19
+    [-1, 1, Conv, [256, 3, 2]],
+
+    # 20
+    [[-1, 14], 1, Concat, [1]],
+
+    # 21
+    [-1, 1, EMA, [384]],
+
+    # 22 (P4 output)
+    [-1, 3, C3, [512, False]],
+
+    # =========================
+    # P4 -> P5
+    # =========================
+
+    # 23
+    [-1, 1, Conv, [512, 3, 2]],
+
+    # 24
+    [[-1, 10], 1, Concat, [1]],
+
+    # 25
+    [-1, 1, EMA, [512]],
+
+    # 26 (P5 output)
+    [-1, 3, C3, [1024, False]],
+
+    # =========================
+    # Detect
+    # =========================
+
+    # Detect(P3, P4, P5)
+    [[18, 22, 26], 1, Detect, [nc, anchors]],
+  ]
