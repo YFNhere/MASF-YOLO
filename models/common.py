@@ -1199,7 +1199,23 @@ class EMA(nn.Module):
 
         x22 = x1.view(
             b * self.groups,
-            c
+            c_per_group,
+            -1
+        )
+
+        weights = (
+            torch.matmul(x11, x12)
+            + torch.matmul(x21, x22)
+        ).view(
+            b * self.groups,
+            1,
+            h,
+            w
+        )
+
+        output = (group_x * weights.sigmoid()).view(b, c, h, w)
+        return output + identity
+
 
 class Proto(nn.Module):
     """YOLOv5 mask Proto module for segmentation models, performing convolutions and upsampling on input tensors."""
