@@ -1084,6 +1084,7 @@ class EMA(nn.Module):
     - Residual connection added
     - Stable GroupNorm strategy
     - Safer tensor reshape operations
+    - Fixed for deterministic training mode compatibility
 
     Args:
         c (int): input/output channels
@@ -1103,13 +1104,6 @@ class EMA(nn.Module):
 
         # Softmax
         self.softmax = nn.Softmax(dim=-1)
-
-        # Global pooling
-        self.agp = nn.AdaptiveAvgPool2d((1, 1))
-
-        # Direction-aware pooling
-        self.pool_h = nn.AdaptiveAvgPool2d((None, 1))
-        self.pool_w = nn.AdaptiveAvgPool2d((1, None))
 
         # Normalization
         # More stable than GroupNorm(c,c)
@@ -1133,11 +1127,8 @@ class EMA(nn.Module):
         )
 
     def forward(self, x):
-
         identity = x
-
         b, c, h, w = x.size()
-
         c_per_group = c // self.groups
 
         # =========================
@@ -1154,11 +1145,11 @@ class EMA(nn.Module):
         # Cross-spatial learning
         # =========================
 
-        # H-direction pooling
-        x_h = self.pool_h(group_x)
+        # H-direction pooling (using mean instead of AdaptiveAvgPool2d for determinism)
+        x_h = group_x.mean(dim=3, keepdim=True)
 
         # W-direction pooling
-        x_w = self.pool_w(group_x).permute(0, 1, 3, 2)
+        x_w = group_x.mean(dim=2, keepdim=True).permute(0, 1, 3, 2)
 
         # Spatial interaction
         hw = self.conv1x1(torch.cat([x_h, x_w], dim=2))
@@ -1179,8 +1170,9 @@ class EMA(nn.Module):
         # Cross attention weights
         # =========================
 
+        # Global average pooling (using mean instead of AdaptiveAvgPool2d)
         x11 = self.softmax(
-            self.agp(x1)
+            x1.mean(dim=(2, 3))
             .view(b * self.groups, -1, 1)
             .permute(0, 2, 1)
         )
@@ -1192,7 +1184,7 @@ class EMA(nn.Module):
         )
 
         x21 = self.softmax(
-            self.agp(x2)
+            x2.mean(dim=(2, 3))
             .view(b * self.groups, -1, 1)
             .permute(0, 2, 1)
         )
