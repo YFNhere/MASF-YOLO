@@ -422,7 +422,6 @@ def parse_model(d, ch):
             nn.ConvTranspose2d,
             DWConvTranspose2d,
             C3x,
-            EMA,
         }:
             c1, c2 = ch[f], args[0]
             if c2 != no:  # if not output
@@ -447,6 +446,13 @@ def parse_model(d, ch):
             c2 = ch[f] * args[0] ** 2
         elif m is Expand:
             c2 = ch[f] // args[0] ** 2
+        elif m is EMA:
+            # EMA expects [c, factor] or just [c]
+            c = ch[f]
+            # Find a valid factor that divides c
+            factor = max(f for f in [32, 16, 8, 4, 2, 1] if c % f == 0)
+            args = [c, factor]
+            c2 = c
         else:
             c2 = ch[f]
 
