@@ -449,8 +449,14 @@ def parse_model(d, ch):
         elif m is EMA:
             # EMA expects [c, factor] or just [c]
             c = ch[f]
-            # Find a valid factor that divides c
-            factor = max(f for f in [32, 16, 8, 4, 2, 1] if c % f == 0)
+            # Use specified factor if provided, otherwise find valid one
+            if len(args) > 1 and isinstance(args[1], int):
+                factor = args[1]
+                if c % factor != 0:
+                    # If factor doesn't divide c, find the largest valid divisor
+                    factor = max(f for f in [32, 16, 8, 4, 2, 1] if c % f == 0)
+            else:
+                factor = max(f for f in [32, 16, 8, 4, 2, 1] if c % f == 0)
             args = [c, factor]
             c2 = c
         else:
