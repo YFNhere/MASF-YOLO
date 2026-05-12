@@ -19,6 +19,7 @@ import pandas as pd
 import requests
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from PIL import Image
 from torch.cuda import amp
 
@@ -1242,7 +1243,35 @@ class Classify(nn.Module):
         self.linear = nn.Linear(c_, c2)  # to x(b,c2)
 
     def forward(self, x):
-        """Processes input through conv, pool, drop, and linear layers; supports list concatenation input."""
         if isinstance(x, list):
             x = torch.cat(x, 1)
         return self.linear(self.drop(self.pool(self.conv(x)).flatten(1)))
+
+
+class CrossScaleFusion(nn.Module):
+    def __init__(self, c2):
+        super().__init__()
+
+        self.reduce_p4 = nn.Conv2d(256, c2, 1)
+        self.reduce_p5 = nn.Conv2d(512, c2, 1)
+
+        self.conv = nn.Sequential(
+            nn.Conv2d(c2 * 3, c2, 1),
+            nn.BatchNorm2d(c2),
+            nn.SiLU()
+        )
+
+    def forward(self, x):
+        p3, p4, p5 = x
+
+        size = p3.shape[2:]
+
+        p4 = self.reduce_p4(p4)
+        p5 = self.reduce_p5(p5)
+
+        p4 = F.interpolate(p4, size=size, mode='nearest')
+        p5 = F.interpolate(p5, size=size, mode='nearest')
+
+        out = torch.cat([p3, p4, p5], dim=1)
+
+        return self.conv(out)

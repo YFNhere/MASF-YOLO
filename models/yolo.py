@@ -40,6 +40,7 @@ from models.common import (
     Contract,
     Conv,
     CrossConv,
+    CrossScaleFusion,
     DetectMultiBackend,
     DWConv,
     DWConvTranspose2d,
@@ -453,6 +454,8 @@ def parse_model(d, ch):
             factor = max(f for f in [32, 16, 8, 4, 2, 1] if c % f == 0)
             args = [c, factor]
             c2 = c
+        elif m is CrossScaleFusion:
+            c2 = args[0]
         else:
             c2 = ch[f]
 
